@@ -1,24 +1,22 @@
 package oam.oamtest.services;
 
+import oam.oamtest.models.ListingModel;
 import oam.oamtest.models.ListingsResponseModel;
 import retrofit2.Call;
+import retrofit2.Callback;
 import retrofit2.GsonConverterFactory;
 import retrofit2.Retrofit;
-import retrofit2.http.Field;
-import retrofit2.http.FormUrlEncoded;
 import retrofit2.http.GET;
-import retrofit2.http.POST;
-import retrofit2.http.Query;
 
 public class ListingsService {
 
     private static ListingsService mListingsService = new ListingsService();
 
-    private ListingsService(){
+    private ListingsService() {
 
     }
 
-    public static ListingsService getInstance( ) {
+    public static ListingsService getInstance() {
         return mListingsService;
     }
 
@@ -31,10 +29,10 @@ public class ListingsService {
                 .build();
     }
 
-    public ListingsResponseModel getListings() throws Exception {
+    public void getListings(Callback<ListingsResponseModel> callback) throws Exception {
         ListingsServices service = buildRestAdapter().create(ListingsServices.class);
         Call<ListingsResponseModel> call = service.getListings();
-        return call.execute().body();
+        call.enqueue(callback);
     }
 
 
