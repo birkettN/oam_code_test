@@ -16,10 +16,14 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 
+import oam.oamtest.fragments.LikesFragment;
 import oam.oamtest.fragments.ListingsFragment;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
+
+    private static final String LISTING_FRAGMENT_TAG = "LISTING_FRAGMENT_TAG";
+    private static final String LIKES_FRAGMENT_TAG = "LIKES_FRAGMENT_TAG";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,15 +43,14 @@ public class MainActivity extends AppCompatActivity
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
-        changeFragment(ListingsFragment.newInstance());
+        changeFragment(ListingsFragment.newInstance(),LISTING_FRAGMENT_TAG);
 
     }
 
-    private void changeFragment(Fragment fragment) {
+    private void changeFragment(Fragment fragment, String tag) {
         FragmentManager fragmentManager = getSupportFragmentManager();
         fragmentManager.beginTransaction()
-                .replace(R.id.listings_container, fragment)
-                .addToBackStack(fragment.getTag())
+                .replace(R.id.listings_container, fragment,tag)
                 .commit();
     }
 
@@ -90,13 +93,30 @@ public class MainActivity extends AppCompatActivity
         int id = item.getItemId();
 
         if (id == R.id.nav_listings) {
+            if(!isFrangmentIsShowing(LISTING_FRAGMENT_TAG)){
+                changeFragment(ListingsFragment.newInstance(),LISTING_FRAGMENT_TAG);
+                getSupportActionBar().setTitle("Listings");
+            }
             // Handle the camera action
         } else if (id == R.id.nav_likes) {
-
+            if(!isFrangmentIsShowing(LIKES_FRAGMENT_TAG)){
+                changeFragment(LikesFragment.newInstance(),LIKES_FRAGMENT_TAG);
+                getSupportActionBar().setTitle("Likes");
+            }
         }
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
     }
+
+    private boolean isFrangmentIsShowing(String tag){
+        Fragment myFragment = getSupportFragmentManager().findFragmentByTag(tag);
+        if (myFragment != null && myFragment.isVisible()) {
+            return true;
+        }
+        return false;
+    }
+
+
 }

@@ -4,6 +4,7 @@ package oam.oamtest.fragments;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
+import android.support.v4.content.ContextCompat;
 import android.support.v4.view.VelocityTrackerCompat;
 import android.util.Log;
 import android.view.GestureDetector;
@@ -13,36 +14,49 @@ import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
 
+import com.j256.ormlite.android.apptools.OpenHelperManager;
+import com.j256.ormlite.dao.Dao;
+import com.j256.ormlite.table.TableUtils;
 import com.squareup.picasso.Picasso;
 
+import java.sql.SQLException;
 import java.util.List;
 
 import oam.oamtest.R;
 import oam.oamtest.models.ListingModel;
 import oam.oamtest.models.ListingsResponseModel;
+import oam.oamtest.repository.DatabaseHelper;
 import oam.oamtest.services.ListingsService;
 import retrofit2.Callback;
 import retrofit2.Response;
 
 public class ListingsFragment extends Fragment {
 
-    private static final int SWIPE_MIN_DISTANCE = 10;
-    private static final int SWIPE_MAX_OFF_PATH = 350;
-    private static final int SWIPE_THRESHOLD_VELOCITY = 300;
+    private static final int DISTANCE_TO_ACTION = 300;
+    private Callback<ListingsResponseModel> callback;
+    private View.OnTouchListener gestureListener;
+    private RelativeLayout listingLayout;
+    private RelativeLayout listingOverlay;
+    private float listingUpdatedX, listingOriginalX;
+    private ListingsService mListingsService;
+    private List<ListingModel> mListings;
+    private ImageView mListingImage;
+    private boolean moveToNext = true;
+    private DatabaseHelper databaseHelper = null;
+    private ProgressBar mProgressBar;
 
-    private GestureDetector gestureDetector;
-    Callback<ListingsResponseModel> callback;
-    View.OnTouchListener gestureListener;
+    private TextView listingTitle;
+    private TextView listingYear;
+    private TextView listingColor;
+    private TextView listingLocation;
+    private TextView listingCondition;
+    private TextView listingTransmission;
+    private TextView listingDoorCount;
 
-    RelativeLayout listingLayout;
-    float listingUpdatedX, listingOriginalX;
-    ListingsService mListingsService;
-    List<ListingModel> mListings;
-    int currentIndex = 0;
-    ImageView mListingImage;
-    boolean moveToNext = true;
 
     public static ListingsFragment newInstance() {
         return new ListingsFragment();
@@ -78,15 +92,20 @@ public class ListingsFragment extends Fragment {
 
         listingLayout = (RelativeLayout) view.findViewById(R.id.listing_layout);
         mListingImage = (ImageView) view.findViewById(R.id.listing_image);
+        mProgressBar = (ProgressBar) view.findViewById(R.id.listing_progress);
+        listingOverlay = (RelativeLayout) view.findViewById(R.id.listing_overlay);
 
-        gestureDetector = new GestureDetector(getActivity(), new MyGestureDetector());
+        listingTitle = (TextView) view.findViewById(R.id.listing_title);
+        listingYear = (TextView) view.findViewById(R.id.listing_year);
+        listingColor = (TextView) view.findViewById(R.id.listing_color);
+        listingLocation = (TextView) view.findViewById(R.id.listing_location);
+        listingCondition = (TextView) view.findViewById(R.id.listing_condition);
+        listingTransmission = (TextView) view.findViewById(R.id.listing_transmission);
+        listingDoorCount = (TextView) view.findViewById(R.id.listing_door_count);
+
+
         gestureListener = new View.OnTouchListener() {
             public boolean onTouch(View v, MotionEvent event) {
-
-                int index = event.getActionIndex();
-                int action = event.getActionMasked();
-                int pointerId = event.getPointerId(index);
-
 
                 switch (event.getAction()) {
 
@@ -94,7 +113,7 @@ public class ListingsFragment extends Fragment {
                     case MotionEvent.ACTION_CANCEL:
 
                         listingLayout.animate().x(listingOriginalX).setDuration(10).start();
-
+                        listingOverlay.setBackgroundColor(ContextCompat.getColor(getActivity(), android.R.color.transparent));
                         break;
 
 
@@ -106,22 +125,30 @@ public class ListingsFragment extends Fragment {
 
                     case MotionEvent.ACTION_MOVE:
 
-                        if(moveToNext){
+                        if (moveToNext) {
                             listingLayout.animate()
                                     .x(event.getRawX() + listingUpdatedX)
                                     .setDuration(0)
                                     .start();
 
-                            if ((listingOriginalX - 300) > listingLayout.getX()) {
-                                moveToNext = false;
+                            if ((listingOriginalX - DISTANCE_TO_ACTION) > listingLayout.getX()) {
+                                removeListing(true);
                                 Log.d("Direction", "LIKE");
                                 showNextListing();
                                 listingLayout.animate().x(listingOriginalX).setDuration(10).start();
-                            } else if ((listingOriginalX + 300) < listingLayout.getX()) {
-                                moveToNext = false;
+                            } else if ((listingOriginalX + DISTANCE_TO_ACTION) < listingLayout.getX()) {
+                                removeListing(false);
                                 Log.d("Direction", "DISLIKE");
                                 showNextListing();
                                 listingLayout.animate().x(listingOriginalX).setDuration(10).start();
+                            } else if ((listingOriginalX - 50) > listingLayout.getX()) {
+                                listingOverlay.setBackgroundColor(ContextCompat.getColor(getActivity(), R.color.like_overlay));
+                            } else if ((listingOriginalX + 50) < listingLayout.getX()) {
+                                listingOverlay.setBackgroundColor(ContextCompat.getColor(getActivity(), R.color.dislike_overlay));
+                            } else if ((listingOriginalX - 1) > listingLayout.getX()) {
+                                listingOverlay.setBackgroundColor(ContextCompat.getColor(getActivity(), android.R.color.transparent));
+                            } else if ((listingOriginalX + 1) < listingLayout.getX()) {
+                                listingOverlay.setBackgroundColor(ContextCompat.getColor(getActivity(), android.R.color.transparent));
                             }
                         }
 
@@ -134,32 +161,50 @@ public class ListingsFragment extends Fragment {
             }
         };
 
-
         return view;
+    }
+
+    private void removeListing(boolean liked) {
+        if (liked) {
+            saveListing(mListings.get(0));
+        }
+
+        moveToNext = false;
+        mListings.remove(0);
     }
 
 
     private void showNextListing() {
-        ListingModel currentListingModel = mListings.get(currentIndex);
+        if (mListings.size() > 0) {
+            mProgressBar.setVisibility(View.VISIBLE);
+            ListingModel currentListingModel = mListings.get(0);
 
-        Picasso.with(getActivity())
-                .load(currentListingModel.default_image)
-                .fit().centerCrop()
-                .tag(currentListingModel.default_image)
-                .into(mListingImage, new com.squareup.picasso.Callback() {
-                    @Override
-                    public void onSuccess() {
-                        moveToNext = true;
-                    }
+            listingTitle.setText(currentListingModel.title);
+            listingYear.setText(currentListingModel.year);
+            listingColor.setText(currentListingModel.colour.title);
+            listingLocation.setText(currentListingModel.location.title);
+            listingCondition.setText(currentListingModel.condition.title);
+            listingTransmission.setText(currentListingModel.transmission.title);
+            listingDoorCount.setText(String.format("%s doors", currentListingModel.door_count.title));
 
-                    @Override
-                    public void onError() {
-                        moveToNext = true;
-                    }
-                });
+            Picasso.with(getActivity())
+                    .load(currentListingModel.default_image)
+                    .fit().centerCrop()
+                    .tag(currentListingModel.default_image)
+                    .into(mListingImage, new com.squareup.picasso.Callback() {
+                        @Override
+                        public void onSuccess() {
+                            moveToNext = true;
+                            mProgressBar.setVisibility(View.INVISIBLE);
+                        }
 
-        currentIndex++;
-
+                        @Override
+                        public void onError() {
+                            moveToNext = true;
+                            mProgressBar.setVisibility(View.INVISIBLE);
+                        }
+                    });
+        }
     }
 
     @Override
@@ -177,34 +222,33 @@ public class ListingsFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-
     }
 
-    class MyGestureDetector extends GestureDetector.SimpleOnGestureListener {
-        @Override
-        public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-            try {
-                if (Math.abs(e1.getY() - e2.getY()) > SWIPE_MAX_OFF_PATH)
-                    return false;
-                if (e1.getX() - e2.getX() > SWIPE_MIN_DISTANCE && Math.abs(velocityX) > SWIPE_THRESHOLD_VELOCITY) {
-                    //   Toast.makeText(getActivity(), "Left Swipe", Toast.LENGTH_SHORT).show();
-                    //  listingLayout.animate().x(e1.getX());
-                } else if (e2.getX() - e1.getX() > SWIPE_MIN_DISTANCE && Math.abs(velocityX) > SWIPE_THRESHOLD_VELOCITY) {
-                    //   listingLayout.setTranslationX(e2.getX());
-                    //  Toast.makeText(getActivity(), "Right Swipe", Toast.LENGTH_SHORT).show();
-                }
-            } catch (Exception e) {
-                // nothing
-            }
-            return false;
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (databaseHelper != null) {
+            OpenHelperManager.releaseHelper();
+            databaseHelper = null;
         }
+    }
 
-
-        @Override
-        public boolean onDown(MotionEvent e) {
-            return true;
+    private DatabaseHelper getHelper() {
+        if (databaseHelper == null) {
+            databaseHelper =
+                    OpenHelperManager.getHelper(getActivity(), DatabaseHelper.class);
         }
+        return databaseHelper;
+    }
 
+    public void saveListing(ListingModel listingModel) {
+        try {
+            Dao<ListingModel, Integer> categoriesDao = getHelper().getListingsDao();
+            categoriesDao.createOrUpdate(listingModel);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
 
