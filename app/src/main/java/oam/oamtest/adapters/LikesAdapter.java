@@ -16,6 +16,7 @@ import java.util.List;
 
 import oam.oamtest.R;
 import oam.oamtest.models.ListingModel;
+import oam.oamtest.ui.CircleTransform;
 
 public class LikesAdapter extends RecyclerView.Adapter<LikesAdapter.ListingViewHolder> {
 
@@ -65,10 +66,10 @@ public class LikesAdapter extends RecyclerView.Adapter<LikesAdapter.ListingViewH
     @Override
     public void onBindViewHolder(ListingViewHolder listingViewHolder, int position) {
         listingViewHolder.mItemView.setTag(position);
-        listingViewHolder.mPrice.setText(String.format("Price: %s %s",mListingModels.get(position).currency_symbol, mListingModels.get(position).price));
-        listingViewHolder.mMileage.setText(String.format("%s",mListingModels.get(position).title));
-        listingViewHolder.mContact.setText(String.format("Contact: %s",mListingModels.get(position).mobile_number));
-        listingViewHolder.mYear.setText(String.format("Year: %s",mListingModels.get(position).year));
+        listingViewHolder.mPrice.setText(String.format("Price: %s %s", mListingModels.get(position).currency_symbol, mListingModels.get(position).price));
+        listingViewHolder.mMileage.setText(String.format("%s", mListingModels.get(position).title));
+        listingViewHolder.mContact.setText(String.format("Contact: %s", mListingModels.get(position).mobile_number));
+        listingViewHolder.mYear.setText(String.format("Year: %s", mListingModels.get(position).year));
 
         listingViewHolder.mImage.setImageDrawable(null);
 
@@ -77,6 +78,7 @@ public class LikesAdapter extends RecyclerView.Adapter<LikesAdapter.ListingViewH
             Picasso.with(mContext)
                     .load(imgUrl)
                     .fit().centerCrop()
+                    .transform(new CircleTransform())
                     .tag(imgUrl)
                     .into(listingViewHolder.mImage);
         }

@@ -6,6 +6,7 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.VelocityTrackerCompat;
+import android.support.v7.widget.CardView;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.LayoutInflater;
@@ -13,6 +14,9 @@ import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
@@ -31,6 +35,7 @@ import oam.oamtest.models.ListingModel;
 import oam.oamtest.models.ListingsResponseModel;
 import oam.oamtest.repository.DatabaseHelper;
 import oam.oamtest.services.ListingsService;
+import oam.oamtest.ui.CircleTransform;
 import retrofit2.Callback;
 import retrofit2.Response;
 
@@ -39,7 +44,7 @@ public class ListingsFragment extends Fragment {
     private static final int DISTANCE_TO_ACTION = 300;
     private Callback<ListingsResponseModel> callback;
     private View.OnTouchListener gestureListener;
-    private RelativeLayout listingLayout;
+    private CardView listingLayout;
     private RelativeLayout listingOverlay;
     private float listingUpdatedX, listingOriginalX;
     private ListingsService mListingsService;
@@ -48,7 +53,6 @@ public class ListingsFragment extends Fragment {
     private boolean moveToNext = true;
     private DatabaseHelper databaseHelper = null;
     private ProgressBar mProgressBar;
-
     private TextView listingTitle;
     private TextView listingYear;
     private TextView listingColor;
@@ -56,7 +60,8 @@ public class ListingsFragment extends Fragment {
     private TextView listingCondition;
     private TextView listingTransmission;
     private TextView listingDoorCount;
-
+    private TextView listingPrice;
+    private Animation fadeIn;
 
     public static ListingsFragment newInstance() {
         return new ListingsFragment();
@@ -66,6 +71,10 @@ public class ListingsFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        fadeIn = new AlphaAnimation(0, 1);
+        fadeIn.setInterpolator(new DecelerateInterpolator());
+        fadeIn.setDuration(3000);
 
 
         callback = new Callback<ListingsResponseModel>() {
@@ -90,7 +99,7 @@ public class ListingsFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_listings, container, false);
 
-        listingLayout = (RelativeLayout) view.findViewById(R.id.listing_layout);
+        listingLayout = (CardView) view.findViewById(R.id.listing_layout);
         mListingImage = (ImageView) view.findViewById(R.id.listing_image);
         mProgressBar = (ProgressBar) view.findViewById(R.id.listing_progress);
         listingOverlay = (RelativeLayout) view.findViewById(R.id.listing_overlay);
@@ -102,7 +111,7 @@ public class ListingsFragment extends Fragment {
         listingCondition = (TextView) view.findViewById(R.id.listing_condition);
         listingTransmission = (TextView) view.findViewById(R.id.listing_transmission);
         listingDoorCount = (TextView) view.findViewById(R.id.listing_door_count);
-
+        listingPrice = (TextView) view.findViewById(R.id.listing_price);
 
         gestureListener = new View.OnTouchListener() {
             public boolean onTouch(View v, MotionEvent event) {
@@ -133,14 +142,14 @@ public class ListingsFragment extends Fragment {
 
                             if ((listingOriginalX - DISTANCE_TO_ACTION) > listingLayout.getX()) {
                                 removeListing(true);
-                                Log.d("Direction", "LIKE");
                                 showNextListing();
-                                listingLayout.animate().x(listingOriginalX).setDuration(10).start();
+                                listingLayout.animate().x(listingOriginalX).setDuration(0).start();
+                                listingLayout.startAnimation(fadeIn);
                             } else if ((listingOriginalX + DISTANCE_TO_ACTION) < listingLayout.getX()) {
                                 removeListing(false);
-                                Log.d("Direction", "DISLIKE");
                                 showNextListing();
-                                listingLayout.animate().x(listingOriginalX).setDuration(10).start();
+                                listingLayout.animate().x(listingOriginalX).setDuration(0).start();
+                                listingLayout.startAnimation(fadeIn);
                             } else if ((listingOriginalX - 50) > listingLayout.getX()) {
                                 listingOverlay.setBackgroundColor(ContextCompat.getColor(getActivity(), R.color.like_overlay));
                             } else if ((listingOriginalX + 50) < listingLayout.getX()) {
@@ -186,10 +195,12 @@ public class ListingsFragment extends Fragment {
             listingCondition.setText(currentListingModel.condition.title);
             listingTransmission.setText(currentListingModel.transmission.title);
             listingDoorCount.setText(String.format("%s doors", currentListingModel.door_count.title));
+            listingPrice.setText(String.format("%s %s", currentListingModel.currency_symbol, currentListingModel.price));
 
             Picasso.with(getActivity())
                     .load(currentListingModel.default_image)
                     .fit().centerCrop()
+                    .transform(new CircleTransform())
                     .tag(currentListingModel.default_image)
                     .into(mListingImage, new com.squareup.picasso.Callback() {
                         @Override
